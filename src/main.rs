@@ -332,8 +332,12 @@ fn convert(input: &str, output: &str) -> CliResult {
     let name = std::path::Path::new(input)
         .file_name()
         .map_or_else(|| input.to_string(), |n| n.to_string_lossy().into_owned());
-    let file = std::io::BufWriter::new(std::fs::File::create(output)?);
-    for warning in indd::convert_into(&bytes, &name, file)? {
+    // Convert in memory first: a failed conversion must not truncate an
+    // existing output file (or the input, when both paths are the same).
+    let mut idml = Vec::new();
+    let warnings = indd::convert_into(&bytes, &name, &mut idml)?;
+    std::fs::write(output, idml)?;
+    for warning in warnings {
         eprintln!("warning: {warning}");
     }
     Ok(())
